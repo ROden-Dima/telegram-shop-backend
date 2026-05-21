@@ -1,72 +1,62 @@
-// database.js - работа с базой данных SQLite
+// database.js - работа с базой данных SQLite (better-sqlite3)
+import Database from 'better-sqlite3';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Открываем соединение с базой данных
-export async function openDb() {
-  return open({
-    filename: './shop.db',      // файл базы данных
-    driver: sqlite3.Database
-  });
-}
+// Подключаемся к базе данных (файл shop.db в папке проекта)
+const db = new Database(path.join(__dirname, 'shop.db'));
 
-// Создаём таблицы (если их нет)
-export async function initDb() {
-  const db = await openDb();
-  
-  // Таблица товаров
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS products (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      description TEXT,
-      price INTEGER,
-      image TEXT,
-      photo_path TEXT,
-      category TEXT
-    )
-  `);
-  
-  console.log('✅ База данных инициализирована');
-  return db;
-}
+// Создаём таблицу товаров (если её нет)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    price INTEGER,
+    image TEXT,
+    photo_path TEXT,
+    category TEXT
+  )
+`);
+
+console.log('✅ База данных инициализирована');
 
 // Получить все товары
-export async function getAllProducts() {
-  const db = await openDb();
-  return await db.all('SELECT * FROM products ORDER BY id');
+export function getAllProducts() {
+  return db.prepare('SELECT * FROM products ORDER BY id').all();
 }
 
 // Получить товар по ID
-export async function getProductById(id) {
-  const db = await openDb();
-  return await db.get('SELECT * FROM products WHERE id = ?', id);
+export function getProductById(id) {
+  return db.prepare('SELECT * FROM products WHERE id = ?').get(id);
 }
 
 // Создать товар
-export async function createProduct(product) {
-  const db = await openDb();
-  const result = await db.run(
-    'INSERT INTO products (name, description, price, image, photo_path, category) VALUES (?, ?, ?, ?, ?, ?)',
-    [product.name, product.description, product.price, product.image, product.photo_path, product.category]
+export function createProduct(product) {
+  const stmt = db.prepare(
+    'INSERT INTO products (name, description, price, image, photo_path, category) VALUES (?, ?, ?, ?, ?, ?)'
   );
-  return { id: result.lastID, ...product };
+  const result = stmt.run(product.name, product.description, product.price, product.image, product.photo_path, product.category);
+  return { id: result.lastInsertRowid, ...product };
 }
 
 // Обновить товар
-export async function updateProduct(id, product) {
-  const db = await openDb();
-  await db.run(
-    'UPDATE products SET name = ?, description = ?, price = ?, image = ?, photo_path = ?, category = ? WHERE id = ?',
-    [product.name, product.description, product.price, product.image, product.photo_path, product.category, id]
+export function updateProduct(id, product) {
+  const stmt = db.prepare(
+    'UPDATE products SET name = ?, description = ?, price = ?, image = ?, photo_path = ?, category = ? WHERE id = ?'
   );
+  stmt.run(product.name, product.description, product.price, product.image, product.photo_path, product.category, id);
   return { id, ...product };
 }
 
 // Удалить товар
-export async function deleteProduct(id) {
-  const db = await openDb();
-  await db.run('DELETE FROM products WHERE id = ?', id);
+export function deleteProduct(id) {
+  const stmt = db.prepare('DELETE FROM products WHERE id = ?');
+  stmt.run(id);
   return true;
 }
+
+export { db };

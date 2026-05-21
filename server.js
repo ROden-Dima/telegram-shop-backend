@@ -1,10 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import fetch from 'node-fetch';
-import { initDb, getAllProducts, getProductById, createProduct, updateProduct, deleteProduct } from './database.js';
+import { getAllProducts, getProductById, createProduct, updateProduct, deleteProduct } from './database.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -12,50 +8,7 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// ========== НАСТРОЙКА ЗАГРУЗКИ ФАЙЛОВ ==========
-const uploadDir = 'uploads';
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
-  console.log('📁 Папка uploads создана');
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const uniqueName = Date.now() + '_' + file.originalname;
-    cb(null, uniqueName);
-  }
-});
-
-const upload = multer({ 
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }
-});
-
-app.use('/uploads', express.static(path.join(process.cwd(), uploadDir)));
-
-// ========== НАСТРОЙКИ УВЕДОМЛЕНИЙ ==========
-// ⚠️ ЗАМЕНИТЕ НА СВОИ ДАННЫЕ
-const BOT_TOKEN = '8724530279:AAHnfsUApQ7K9zbiPhgK0qw7KaA-LKnxHxg';   // Токен от @BotFather
-const CHAT_ID = '967598901';    // Ваш ID от @userinfobot
-
-// ========== API ЭНДПОИНТЫ ==========
-
-// Загрузка фото
-app.post('/api/upload', upload.single('image'), (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: 'Файл не загружен' });
-    }
-    const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
-    const imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
-    res.json({ success: true, imageUrl });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// Получить все товары (из БД)
+// Получить все товары
 app.get('/api/products', async (req, res) => {
   const products = await getAllProducts();
   res.json({ success: true, products, totalRows: products.length });
@@ -126,46 +79,12 @@ app.get('/api/main_slider', (req, res) => {
   res.json({ success: true, data: [] });
 });
 
-// Заказ с уведомлением
-app.post('/api/orders', async (req, res) => {
-  const order = req.body;
-  console.log('📦 Новый заказ:', order);
-  
-  const message = `
-🛒 *НОВЫЙ ЗАКАЗ!*
-
-👤 *Клиент:* ${order.customer?.name || 'Не указан'}
-📞 *Телефон:* ${order.customer?.phone || 'Не указан'}
-📍 *Адрес:* ${order.customer?.address || 'Не указан'}
-
-📦 *Товары:*
-${order.items?.map(item => `  • ${item.name} — ${item.quantity} шт. x ${item.price} ₽ = ${item.quantity * item.price} ₽`).join('\n') || 'Нет товаров'}
-
-💰 *Итого:* ${order.totalPrice} ₽
-📅 *Дата:* ${new Date().toLocaleString()}
-  `;
-
-  try {
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: CHAT_ID, text: message, parse_mode: 'Markdown' })
-    });
-    console.log('✅ Уведомление отправлено');
-  } catch (error) {
-    console.error('❌ Ошибка отправки уведомления:', error.message);
-  }
-
-  res.json({ success: true, message: 'Заказ принят' });
-});
-
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
 // Запуск сервера
-async function startServer() {
-  await initDb();
+function startServer() {
   app.listen(PORT, () => {
     console.log(`✅ Server on http://localhost:${PORT}`);
   });

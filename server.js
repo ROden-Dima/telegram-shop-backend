@@ -4,7 +4,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import fetch from 'node-fetch';
-import { initDb, getAllProducts, getProductById, createProduct, updateProduct, deleteProduct } from './database.js';
+import { getAllProducts, getProductById, createProduct, updateProduct, deleteProduct } from './database.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -164,8 +164,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Запуск сервера
-async function startServer() {
-  await initDb();
+function startServer() {
   app.listen(PORT, () => {
     console.log(`✅ Server on http://localhost:${PORT}`);
   });
